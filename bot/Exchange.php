@@ -10,11 +10,13 @@ abstract class Exchange {
   protected $apiSecret;
   //
   protected $wallets = [ ];
-  protected $transferFees = [ ];
+  protected $depositFees = [ ];
+  protected $withdrawFees = [ ];
   protected $confirmationTimes = [ ];
   protected $names = [ ];
   protected $pairs = [ ];
-  protected $tradeablePairs = [ ];
+  protected $depositablePairs = [ ];
+  protected $withdrawablePairs = [ ];
   protected $tradeables = [ ];
 
   function __construct( $apiKey, $apiSecret ) {
@@ -63,9 +65,9 @@ abstract class Exchange {
       $averageRate = Database::getAverageRate( $tradeable );
 
       // If the tradeable is too expensive to transfer, let it go.
-      if ( isset( $this->transferFees[ $tradeable ] ) &&
-           !endsWith( $this->transferFees[ $tradeable ], '%' ) &&
-           $this->transferFees[ $tradeable ] * $averageRate >= $maxTxFee ) {
+      if ( isset( $this->withdrawFees[ $tradeable ] ) &&
+           !endsWith( $this->withdrawFees[ $tradeable ], '%' ) &&
+           $this->withdrawFees[ $tradeable ] * $averageRate >= $maxTxFee ) {
         continue;
       }
 
@@ -77,25 +79,49 @@ abstract class Exchange {
 
       $pairs[] = $pair;
       $tradeables[] = array(
-	'CoinType' => 'BITCOIN',
-	'Currency' => $tradeable,
+        'CoinType' => 'BITCOIN',
+        'Currency' => $tradeable,
       );
     }
 
-    $this->tradeablePairs = $pairs;
+    $depositables = array( );
+    foreach ( $this->pairs as $pair ) {
+      $arr = explode( '_', $pair );
+      $tradeable = $arr[ 0 ];
+      $currency = $arr[ 1 ];
+      $averageRate = Database::getAverageRate( $tradeable );
+
+      // If the tradeable is too expensive to deposit, let it go.
+      if ( isset( $this->depositFees[ $tradeable ] ) &&
+           !endsWith( $this->depositFees[ $tradeable ], '%' ) &&
+           $this->depositFees[ $tradeable ] * $averageRate >= $maxTxFee ) {
+        continue;
+      }
+
+      // If a transaction of the tradeable takes too long to confirm on its blockchain, let it go.
+      if ( isset( $this->confirmationTimes[ $tradeable ] ) &&
+           $this->confirmationTimes[ $tradeable ] >= $maxConfTime ) {
+        continue;
+      }
+
+      $depositables[] = $pair;
+    }
+
+    $this->depositablePairs = $depositables;
+    $this->withdrawablePairs = $pairs;
     $this->tradeables = $tradeables;
 
   }
 
-  public function getAllPairs() {
+  public function getDepositablePairs() {
 
-    return $this->pairs;
+    return $this->depositablePairs;
 
   }
 
-  public function getTradeablePairs() {
+  public function getWithdrawablePairs() {
 
-    return $this->tradeablePairs;
+    return $this->withdrawablePairs;
 
   }
 
@@ -136,14 +162,30 @@ abstract class Exchange {
 
   }
 
-  public function getTransferFee( $tradeable, $amount ) {
+  public function getWithdrawFee( $tradeable, $amount ) {
 
-    if ( !key_exists( $tradeable, $this->transferFees ) ) {
+    if ( !key_exists( $tradeable, $this->withdrawFees ) ) {
       //logg( $this->prefix() . "WARNING: Unknown transfer fee for $tradeable. Calculations may be inaccurate!" );
       return null;
     }
 
-    $fee = $this->transferFees[ $tradeable ];
+    $fee = $this->withdrawFees[ $tradeable ];
+
+    if ( endsWith( $fee, '%' ) ) {
+      return $amount * substr( $fee, 0, -1 );
+    }
+    return $fee;
+
+  }
+
+  public function getDepositFee( $tradeable, $amount ) {
+
+    if ( !key_exists( $tradeable, $this->depositFees ) ) {
+      //logg( $this->prefix() . "WARNING: Unknown deposit fee for $tradeable. Calculations may be inaccurate!" );
+      return null;
+    }
+
+    $fee = $this->depositFees[ $tradeable ];
 
     if ( endsWith( $fee, '%' ) ) {
       return $amount * substr( $fee, 0, -1 );
@@ -268,9 +310,15 @@ abstract class Exchange {
 
   }
 
+  public function withdrawSupportsTag() {
+
+    return true;
+
+  }
+
   public abstract function getTickers( $currency );
 
-  public abstract function withdraw( $coin, $amount, $address );
+  public abstract function withdraw( $coin, $amount, $address, $tag = null );
 
   public abstract function getDepositAddress( $coin );
 
@@ -298,6 +346,10 @@ abstract class Exchange {
 
   public abstract function getSmallestOrderSize( $tradeable, $currency, $type );
 
+  public abstract function getPrecision( $tradeable, $currency );
+
+  public abstract function getLimits( $tradeable, $currency );
+
   public abstract function getID();
 
   public abstract function getName();
@@ -305,6 +357,13 @@ abstract class Exchange {
   public abstract function getTradeHistoryCSVName();
 
   public abstract function testAccess();
+
+  public function getWithdrawLimits( $tradeable, $currency ) {
+
+    // By default, use the trade limits.
+    return $this->getLimits( $tradeable, $currency );
+
+  }
 
   protected abstract function fetchOrderbook( $tradeable, $currency );
 
@@ -316,20 +375,7 @@ abstract class Exchange {
 
   protected function nonce() {
 
-    static $previousNonce = array( );
-    $id = $this->getID();
-    if ( !isset( $previousNonce[ $id ] ) ) {
-      $previousNonce[ $id ] = 0;
-    }
-
-    // Try the current time, if we're getting called too fast, step up one by one.
-    $nonce = floor( microtime( true ) * 1000000);
-    if ( $nonce <= $previousNonce[ $id ] ) {
-      $nonce = $previousNonce[ $id ] + 1;
-    }
-
-    $previousNonce[ $id ] = $nonce;
-    return $nonce;
+    return generateNonce( $this->getID() );
 
   }
 

@@ -1,24 +1,22 @@
 <?php
 
 require_once __DIR__ . '/../Config.php';
-require_once __DIR__ . '/../BittrexLikeExchange.php';
+require_once __DIR__ . '/../HitBTCLikeExchange.php';
 
-class Bittrex extends BittrexLikeExchange {
+class HitBTC extends HitBTCLikeExchange {
 
-  const ID = 3;
+  const ID = 7;
   //
-  const PUBLIC_URL = 'https://bittrex.com/api/v1.1/public/';
-  const PRIVATE_URL = 'https://bittrex.com/api/v1.1/';
+  const PUBLIC_URL = 'https://api.HitBTC.com/api/2/public/';
+  const PRIVATE_URL = 'https://api.HitBTC.com/api/2/';
 
   private $fullOrderHistory = null;
 
   function __construct() {
-    parent::__construct( Config::get( "bittrex.key" ), Config::get( "bittrex.secret" ),
+    parent::__construct( Config::get( "HitBTC.key" ), Config::get( "HitBTC.secret" ),
                          array(
-      'separator' => '-',
-      'offsetCurrency' => 0,
-      'offsetTradeable' => 1,
-    ), 'OrderUuid', 'uuid', 'both' );
+      'separator' => '',
+    ) );
 
   }
 
@@ -38,17 +36,15 @@ class Bittrex extends BittrexLikeExchange {
   }
 
   public function getFilledOrderPrice( $type, $tradeable, $currency, $id ) {
-    $market = $currency . '-' . $tradeable;
-    $result = $this->queryAPI( 'account/getorderhistory', [ 'market' => $market ] );
+    $market = $currency . '' . $tradeable;
+    $result = $this->queryAPI( 'history/order', [ 'symbol' => $market ] );
     $id = trim( $id, '{}' );
 
     foreach ($result as $order) {
-      if ($order[ 'OrderUuid' ] == $id) {
-        if ($order[ 'QuantityRemaining' ] != 0) {
-          logg( $this->prefix() . "Order " . $id . " assumed to be filled but " . $order[ 'QuantityRemaining' ] . " still remaining" );
-        }
+      if ($order[ 'clientOrderId' ] == $id) {
+        
         $factor = ($type == 'sell') ? -1 : 1;
-        return $order[ 'Price' ] + $factor * $order[ 'Commission' ];
+        return $order[ 'price' ] + $factor;
       }
     }
     return null;
@@ -65,8 +61,8 @@ class Bittrex extends BittrexLikeExchange {
     if (!$recentOnly && $this->fullOrderHistory !== null) {
       $results = $this->fullOrderHistory;
     } else if (!$recentOnly && !$this->fullOrderHistory &&
-               file_exists( __DIR__ . '/../../bittrex-fullOrders.csv' )) {
-      $file = file_get_contents( __DIR__ . '/../../bittrex-fullOrders.csv' );
+               file_exists( __DIR__ . '/../../HitBTC-fullOrders.csv' )) {
+      $file = file_get_contents( __DIR__ . '/../../HitBTC-fullOrders.csv' );
       $file = iconv( 'utf-16', 'utf-8', $file );
       $lines = explode( "\r\n", $file );
       $first = true;
@@ -84,7 +80,7 @@ class Bittrex extends BittrexLikeExchange {
 	$arr = explode( '-', $market );
 	$currency = $arr[ 0 ];
 	$tradeable = $arr[ 1 ];
-	$market = "${currency}_${tradeable}";
+	$market = "${currency}${tradeable}";
 	$amount = $data[ 3 ];
 	$feeFactor = ($data[ 2 ] == 'LIMIT_SELL') ? -1 : 1;
 	$results[ $market ][] = array(
@@ -103,26 +99,25 @@ class Bittrex extends BittrexLikeExchange {
       $this->fullOrderHistory = $results;
     }
 
-    $result = $this->queryAPI( 'account/getorderhistory' );
+    $result = $this->queryAPI( 'history/order' );
+    logg($result);
+    $checkArray = !empty( $result );
 
-    $checkArray = !empty( $results );
-
+      if (!empty($result)) {
     foreach ($result as $row) {
       $market = $row[ 'Exchange' ];
       $arr = explode( '-', $market );
       $currency = $arr[ 0 ];
       $tradeable = $arr[ 1 ];
-      $market = "${currency}_${tradeable}";
+      $market = "${currency}${tradeable}";
       if (!in_array( $market, array_keys( $results ) )) {
         $results[ $market ] = array();
       }
-      $amount = $row[ 'Quantity' ] - $row[ 'QuantityRemaining' ];
-      $feeFactor = ($row[ 'OrderType' ] == 'LIMIT_SELL') ? -1 : 1;
+      $amount = $row[ 'quantity' ];
 
-      if ($checkArray) {
         $seen = false;
         foreach ($results[ $market ] as $item) {
-          if ($item[ 'rawID' ] == $row[ 'OrderUuid' ]) {
+          if ($item[ 'rawID' ] == $row[ 'clientOrderId' ]) {
             // We have already recorder this ID.
             $seen = true;
             break;
@@ -131,21 +126,20 @@ class Bittrex extends BittrexLikeExchange {
         if ($seen) {
           continue;
         }
-      }
 
       $results[ $market ][] = array(
-        'rawID' => $row[ 'OrderUuid' ],
-        'id' => $row[ 'OrderUuid' ],
+        'rawID' => $row[ 'clientOrderId' ],
+        'id' => $row[ 'clientOrderId' ],
         'currency' => $currency,
         'tradeable' => $tradeable,
-        'type' => $type_map[ $row[ 'OrderType' ] ],
-        'time' => strtotime( $row[ 'TimeStamp' ] ),
-        'rate' => $row[ 'PricePerUnit' ],
+        'type' => $type_map[ $row[ 'type' ] ],
+        'time' => strtotime( $row[ 'createdAt' ] ),
+        'rate' => $row[ 'price' ],
         'amount' => $amount,
-        'fee' => $feeFactor * $row[ 'Commission' ],
-        'total' => $row[ 'Price' ],
+        'total' => $row[ 'price' ],
       );
     }
+      }
 
     foreach ( array_keys( $results ) as $market ) {
       usort( $results[ $market ], 'compareByTime' );
@@ -198,31 +192,31 @@ class Bittrex extends BittrexLikeExchange {
 
   public function getID() {
 
-    return Bittrex::ID;
+    return HitBTC::ID;
 
   }
 
   public function getName() {
 
-    return "BITTREX";
+    return "HitBTC";
 
   }
 
   public function getTradeHistoryCSVName() {
 
-    return "bittrex-fullOrders.csv";
+    return "HitBTC-fullOrders.csv";
 
   }
 
   protected function getPublicURL() {
 
-    return Bittrex::PUBLIC_URL;
+    return HitBTC::PUBLIC_URL;
 
   }
 
   protected function getPrivateURL() {
 
-    return Bittrex::PRIVATE_URL;
+    return HitBTC::PRIVATE_URL;
 
   }
 

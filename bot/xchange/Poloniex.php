@@ -58,7 +58,7 @@ class Poloniex extends Exchange {
 
   }
 
-  public function withdraw( $coin, $amount, $address ) {
+  public function withdraw( $coin, $amount, $address, $tag = null ) {
 
     try {
       $this->queryWithdraw( $coin, $amount, $address );
@@ -393,11 +393,34 @@ class Poloniex extends Exchange {
     $this->tradeFee = floatval( $feeInfo[ 'takerFee' ] );
 
     $this->pairs = $pairs;
-    $this->transferFees = $fees;
+    $this->withdrawFees = $fees;
     $this->confirmationTimes = $conf;
     $this->depositAddresses = $depositAddresses;
 
     $this->calculateTradeablePairs();
+
+  }
+
+  public function getPrecision( $tradeable, $currency ) {
+
+    // Hardcode the precision
+    return array( 'amount' => 8, 'price' => 8 );
+
+  }
+
+  public function getLimits( $tradeable, $currency ) {
+
+    // Hardcode the limits
+    return array(
+      'amount' => array (
+          'min' => 0.00000001,
+          'max' => 1000000000,
+      ),
+      'price' => array (
+          'min' => 0.00000001,
+          'max' => 1000000000,
+      )
+    );
 
   }
 
@@ -418,6 +441,48 @@ class Poloniex extends Exchange {
           alert( 'stuck-transfer', $this->prefix() . "Stuck $key! Please investigate and open support ticket at Poloniex if neccessary!\n\n" . print_r( $entry, true ), true );
           $this->lastStuckReportTime[ $key ] = $timestamp;
         }
+      }
+    }
+
+  }
+
+  private $lastDuplicateWithdrawalTime = 0;
+
+  public function detectDuplicateWithdrawals() {
+
+    $history = $this->queryDepositsAndWithdrawals();
+    $block = $history[ 'withdrawals' ];
+    usort( $block, 'compareByTimeStamp' );
+    $prevTimestamp = 0;
+    $prevTxId = '';
+    $prevAmount = '';
+    $prevAddress = '';
+    foreach ( $block as $entry ) {
+      $status = strtoupper( $entry[ 'status' ] );
+      $timestamp = $entry[ 'timestamp' ];
+      if ( $timestamp < $this->lastDuplicateWithdrawalTime ||
+           substr( $status, 0, 10 ) != 'COMPLETE: ' ) {
+        continue;
+      }
+      // status is in the following format: "COMPLETE: txid"
+      $txid = substr( $status, 10 );
+      $amount = $entry[ 'amount' ];
+      $address = $entry[ 'address' ];
+      $matched = false;
+      if ( $timestamp == $prevTimestamp &&
+           $txid == $prevTxId &&
+           $amount == $prevAmount &&
+           $address == $prevAddress ) {
+        $matched = true;
+      }
+      $prevTimestamp = $timestamp;
+      $prevTxId = $txid;
+      $prevAmount = $amount;
+      $prevAddress = $address;
+
+      if ( $timestamp < time() - 24 * 3600 && $matched ) {
+        alert( 'duplicate-withdrawal', $this->prefix() . "Duplicate withdrawal! Please investigate and open support ticket at Poloniex if necessary!\r\r" . print_r( $entry, true ), true );
+        $this->lastDuplicateWithdrawalTime = $timestamp;
       }
     }
 

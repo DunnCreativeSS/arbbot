@@ -103,7 +103,7 @@ foreach ( glob( 'bot/xchange/*.php' ) as $filename ) {
     $exchanges[] = new $name;
   }
   catch ( Exception $ex ) {
-    logg( "$name not configured" );
+    logg( $ex->getMessage() );
   }
 }
 

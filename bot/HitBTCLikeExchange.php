@@ -3,8 +3,8 @@
 require_once __DIR__ . '/Exchange.php';
 
 // This class implements the common functionality among exchanges that share a
-// similar API to Bittrex.
-abstract class BittrexLikeExchange extends Exchange {
+// similar API to HitBTC.
+abstract class HitBTCLikeExchange extends Exchange {
 
   private $marketOptions = [ ];
   private $orderIDField = '';
@@ -15,12 +15,9 @@ abstract class BittrexLikeExchange extends Exchange {
   protected abstract function getPublicURL();
   protected abstract function getPrivateURL();
 
-  function __construct( $apiKey, $apiSecret, $marketOptions, $orderIDField, $orderIDParam, $orderbookBothPhrase ) {
+  function __construct( $apiKey, $apiSecret, $marketOptions) {
     parent::__construct( $apiKey, $apiSecret );
     $this->marketOptions = $marketOptions;
-    $this->orderIDField = $orderIDField;
-    $this->orderIDParam = $orderIDParam;
-    $this->orderbookBothPhrase = $orderbookBothPhrase;
   }
 
   public function getTickers( $currency ) {
@@ -31,12 +28,12 @@ abstract class BittrexLikeExchange extends Exchange {
 
     foreach ( $markets as $market ) {
 
-      $name = $this->parseMarketName( $market[ 'MarketName' ] );
+      $name = $this->parseMarketName( $market[ 'symbol' ] );
       if ( $name[ 'currency' ] != $currency ) {
         continue;
       }
 
-      $ticker[ $name[ 'tradeable' ] ] = $market[ 'Last' ];
+      $ticker[ $name[ 'tradeable' ] ] = $market[ 'last' ];
     }
 
     return $ticker;
@@ -99,14 +96,14 @@ abstract class BittrexLikeExchange extends Exchange {
       return null;
     }
 
-    $ask = $orderbook[ 'sell' ];
+    $ask = $orderbook[ 'ask' ];
     if ( count( $ask ) == 0 ) {
       return null;
     }
 
     $bestAsk = $ask[ 0 ];
 
-    $bid = $orderbook[ 'buy' ];
+    $bid = $orderbook[ 'bid' ];
     if ( count( $bid ) == 0 ) {
       return null;
     }
@@ -117,8 +114,8 @@ abstract class BittrexLikeExchange extends Exchange {
     return new Orderbook( //
             $this, $tradeable, //
             $currency, //
-            new OrderbookEntry( $bestAsk[ 'Quantity' ], $bestAsk[ 'Rate' ] ), //
-            new OrderbookEntry( $bestBid[ 'Quantity' ], $bestBid[ 'Rate' ] ) //
+            new OrderbookEntry( $bestAsk[ 'size' ], $bestAsk[ 'price' ] ), //
+            new OrderbookEntry( $bestBid[ 'size' ], $bestBid[ 'price' ] ) //
     );
 
   }
@@ -136,32 +133,29 @@ abstract class BittrexLikeExchange extends Exchange {
   public function refreshExchangeData() {
 
     $pairs = [ ];
-    $markets = $this->queryMarkets();
-    $currencies = $this->queryCurrencies();
+    $markets = ($this->queryMarkets());
+    $currencies = ($this->queryCurrencies());
 
     // This is a list of tradeables that have a market. Used to filter the
     // tx-fee list, which is later used to seed the wallets
     $tradeables = [ ];
     $this->minTradeSize = [ ];
     foreach ( $markets as $market ) {
-
-      $tradeable = $market[ 'MarketCurrency' ];
-      $currency = $market[ 'BaseCurrency' ];
+      $market = json_encode($market, true);
+      $market = json_decode($market, true);
+      $tradeable = $market[ 'baseCurrency' ];
+      $currency = $market[ 'quoteCurrency' ];
 
       if ( !Config::isCurrency( $currency ) ||
            Config::isBlocked( $tradeable ) ) {
         continue;
       }
 
-      // Bleutrade also uses MaintenanceMode.
-      if ( !$market[ 'IsActive' ] || @$market[ 'MaintenanceMode' ] ) {
-        continue;
-      }
 
       $tradeables[] = $tradeable;
       $pair = $tradeable . '_' . $currency;
       $pairs[] = $pair;
-      $this->minTradeSize[ $pair ] = $market[ 'MinTradeSize' ];
+      $this->minTradeSize[ $pair ] = $market[ 'tickSize' ];
     }
 
     $names = [ ];
@@ -170,21 +164,23 @@ abstract class BittrexLikeExchange extends Exchange {
 
     foreach ( $currencies as $data ) {
 
-      $coin = strtoupper( $data[ 'Currency' ] );
-      $type = strtoupper( $data[ 'CoinType' ] );
+      $data = json_encode($data, true);
+      $data = json_decode($data, true);
+      $coin = strtoupper( $data[ 'id' ] );
+      $type = strtoupper( $data[ 'crypto' ] );
 
       if ( $coin == 'BTC' ||
            array_search( $coin, $tradeables ) !== false ) {
-        $names[ $coin ] = strtoupper( $data[ 'CurrencyLong' ] );
-        $txFees[ $coin ] = $data[ 'TxFee' ] . ($type == 'BITCOIN_PERCENTAGE_FEE' ? '%' : '');
-        $conf[ $coin ] = $data[ 'MinConfirmation' ];
+        $names[ $coin ] = strtoupper( $data[ 'fullName' ] );
+        $txFees[ $coin ] = $data[ 'payoutFee' ] . ($type == 'BITCOIN_PERCENTAGE_FEE' ? '%' : '');
+        //$conf[ $coin ] = $data[ 'MinConfirmation' ];
       }
     }
 
     $this->pairs = $pairs;
     $this->names = $names;
     $this->withdrawFees = $txFees;
-    $this->confirmationTimes = $conf;
+    $this->confirmationTimes = 100;
 
     $this->calculateTradeablePairs();
 
@@ -262,7 +258,9 @@ abstract class BittrexLikeExchange extends Exchange {
       $currencies = $this->queryCurrencies();
     }
     foreach ( $currencies as $currency ) {
-      if ( $currency[ 'CoinType' ] != 'BITCOIN' ) {
+      $currency = json_encode($currency, true);
+      $currency = json_decode($currency, true);
+      if ( $currency[ 'CoinType' ] != 'Bitcoin' ) {
         // Ignore non-BTC assets for now.
         continue;
       }
@@ -271,8 +269,11 @@ abstract class BittrexLikeExchange extends Exchange {
     $wallets[ 'BTC' ] = 0;
 
     $balances = $this->queryBalances();
+
     foreach ( $balances as $balance ) {
-      $wallets[ strtoupper( $balance[ 'Currency' ] ) ] = floatval( $balance[ 'Available' ] );
+      $balance = json_encode($balance, true);
+      $balance = json_decode($balance, true);
+      $wallets[ strtoupper( $balance[ 'currency' ] ) ] = floatval( $balance[ 'available' ] );
     }
 
     $this->wallets = $wallets;
@@ -293,18 +294,20 @@ abstract class BittrexLikeExchange extends Exchange {
 
     for ( $i = 0; $i < 100; $i++ ) {
       try {
-        $data = $this->queryAPI( 'account/getdepositaddress', ['currency' => $coin ] );
-        return isset( $data[ 'Address' ] ) ? $data[ 'Address' ] : null;
+        $data = $this->queryAPI( 'account/crypto/address/', ['currency' => $coin ] );
+        return isset( $data[ 'address' ] ) ? $data[ 'address' ] : null;
       }
       catch ( Exception $ex ) {
         if ( strpos( $ex->getMessage(), 'ADDRESS_GENERATING' ) !== false ) {
-          // Wait while the address is being generated.
+         logg($ex->getMessage());
           sleep( 30 );
           continue;
         }
         if ( strpos( $ex->getMessage(), '_OFFLINE' ) !== false ) {
+           logg($ex->getMessage());
           $this->onMarketOffline( $coin );
         }
+         logg($ex->getMessage());
         throw $ex;
       }
     }
@@ -314,36 +317,33 @@ abstract class BittrexLikeExchange extends Exchange {
   }
 
   private function queryOrderbook( $tradeable, $currency ) {
-    return $this->xtractResponse( $this->queryPublicJSON( $this->getPublicURL() . 'getorderbook?depth=1&type=' . $this->orderbookBothPhrase . '&market=' . $this->makeMarketName( $currency, $tradeable ) ) );
+    return json_decode($this->xtractResponse( $this->queryPublicJSON( $this->getPublicURL() . 'orderbook/' . $this->makeMarketName( $currency, $tradeable ) ) ));
 
   }
 
   private function queryMarkets() {
-    return $this->xtractResponse( $this->queryPublicJSON( $this->getPublicURL() . 'getmarkets' ) );
+    return json_decode($this->xtractResponse( $this->queryPublicJSON( $this->getPublicURL() . 'symbol' ) ));
 
   }
 
   private function queryCurrencies() {
-    return $this->xtractResponse( $this->queryPublicJSON( $this->getPublicURL() . 'getcurrencies' ) );
+    return json_decode($this->xtractResponse( $this->queryPublicJSON( $this->getPublicURL() . 'currency' ) ));
 
   }
 
   private function queryMarketSummary() {
-    return $this->xtractResponse( $this->queryPublicJSON( $this->getPublicURL() . 'getmarketsummaries' ) );
+    return json_decode($this->xtractResponse( $this->queryPublicJSON( $this->getPublicURL() . 'ticker' ) ));
 
   }
 
   protected function queryCancelOrder( $id ) {
-    return $this->queryAPI( 'market/cancel', //
-                    [
-                $this->orderIDParam => $id
-                    ]
-    );
+    return json_decode($this->queryAPI( 'order/'.$this->orderIDParam));
+    
 
   }
 
   private function queryOpenOrders() {
-    return $this->queryAPI( 'market/getopenorders' );
+    return json_decode($this->queryAPI( 'order' ));
 
   }
 
@@ -366,11 +366,12 @@ abstract class BittrexLikeExchange extends Exchange {
 
   private function queryOrder( $tradeable, $currency, $orderType, $rate, $amount ) {
 
-    $result = $this->queryAPI( 'market/' . strtolower( $orderType ) . 'limit', //
+    $result = $this->queryAPI( 'order', //
             [
-        'market' => $this->makeMarketName( $currency, $tradeable ),
+            'type' => strtolower( $orderType ),
+        'symbol' => $this->makeMarketName( $currency, $tradeable ),
         'quantity' => formatBTC( $amount ),
-        'rate' => formatBTC( $rate )
+        'price' => formatBTC( $rate )
             ]
     );
 
@@ -383,7 +384,7 @@ abstract class BittrexLikeExchange extends Exchange {
   }
 
   private function queryBalances() {
-    return $this->queryAPI( 'account/getbalances' );
+    return json_decode($this->queryAPI( 'account/balance' ));
 
   }
 
@@ -394,10 +395,10 @@ abstract class BittrexLikeExchange extends Exchange {
   }
 
   protected function queryWithdraw( $coin, $amount, $address, $tag ) {
-    return $this->queryAPI( 'account/withdraw', //
+    return $this->queryAPI( 'account/crypto/withdraw', //
                     [
                 'currency' => $coin,
-                'quantity' => formatBTC( $amount ),
+                'amount' => formatBTC( $amount ),
                 'address' => $address
                     ]
     );
@@ -406,25 +407,19 @@ abstract class BittrexLikeExchange extends Exchange {
 
   protected function xtractResponse( $response ) {
 
-    $data = json_decode( $response, true );
+    $data = $response;
 
     if ( !$data ) {
       throw new Exception( "Invalid data received: (" . $response . ")" );
     }
 
-    if ( !key_exists( 'result', $data ) || !key_exists( 'success', $data ) || $data[ 'success' ] != true ) {
-
-      if ( key_exists( 'message', $data ) ) {
-        throw new Exception( "API error response: " . $data[ 'message' ] );
-      }
-
-      throw new Exception( "API error: " . print_r( $data, true ) );
-    }
-
-    return $data[ 'result' ];
+    return $data;
 
   }
-
+ private function _signature($uri, $postData)
+    {
+        return strtolower(hash_hmac('sha512', $uri . $postData, $this->apiSecret));
+    }
   protected function queryAPI( $method, $req = [ ] ) {
 
     $key = $this->apiKey;
@@ -448,6 +443,9 @@ abstract class BittrexLikeExchange extends Exchange {
     curl_setopt( $ch, CURLOPT_HTTPHEADER, ["apisign: $sign" ] );
     curl_setopt( $ch, CURLOPT_CONNECTTIMEOUT, 10 );
     curl_setopt( $ch, CURLOPT_TIMEOUT, 180 );
+
+        curl_setopt($ch, CURLOPT_USERPWD, $key . ":" . $secret);  
+
 
     $error = null;
     for ( $i = 0; $i < 5; $i++ ) {
@@ -485,7 +483,7 @@ abstract class BittrexLikeExchange extends Exchange {
         $uri = $this->getPrivateURL() . $method . '?' . http_build_query( $req );
         $sign = hash_hmac( 'sha512', $uri, $secret );
         curl_setopt( $ch, CURLOPT_URL, $uri );
-        curl_setopt( $ch, CURLOPT_HTTPHEADER, ["apisign: $sign" ] );
+        curl_setopt($ch, CURLOPT_USERPWD, $key . ":" . $secret);  
         continue;
       }
     }

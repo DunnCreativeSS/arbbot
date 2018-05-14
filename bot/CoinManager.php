@@ -1,15 +1,5 @@
 <?php
 
-class CoinEntry {
-
-  public $amount;
-  public $coin;
-  public $exchange;
-  public $profit;
-  public $time;
-
-}
-
 class CoinManager {
 
   //
@@ -195,10 +185,12 @@ class CoinManager {
           // Retrieve average exchange rates for this coin:
           $averageRate = Database::getAverageRate( $coin );
 
-          $txFee = abs( $exchange->getTransferFee( $coin, 1 ) * $averageRate );
+          $depositFee = abs( $exchange->getDepositFee( $coin, 1 ) * $averageRate );
+          $withdrawFee = abs( $exchange->getWithdrawFee( $coin, 1 ) * $averageRate );
           $confTime = $exchange->getConfirmationTime( $coin );
 
-          if ($txFee < Config::get( Config::MAX_TX_FEE_ALLOWED, Config::DEFAULT_MAX_TX_FEE_ALLOWED ) &&
+          if ($depositFee < Config::get( Config::MAX_TX_FEE_ALLOWED, Config::DEFAULT_MAX_TX_FEE_ALLOWED ) &&
+              $withdrawFee < Config::get( Config::MAX_TX_FEE_ALLOWED, Config::DEFAULT_MAX_TX_FEE_ALLOWED ) &&
               $confTime < Config::get( Config::MAX_MIN_CONFIRMATIONS_ALLOWED, Config::DEFAULT_MAX_MIN_CONFIRMATIONS_ALLOWED ) ) {
             $maxTradeSize = Config::get( Config::MAX_TRADE_SIZE, Config::DEFAULT_MAX_TRADE_SIZE );
             $balanceFactor = Config::get( Config::BALANCE_FACTOR, Config::DEFAULT_BALANCE_FACTOR );
@@ -302,7 +294,7 @@ class CoinManager {
     $nearZeroThreshold = Config::get( Config::NEAR_ZERO_BTC_VALUE, Config::DEFAULT_NEAR_ZERO_BTC_VALUE );
     foreach ( $exchanges as $exchange ) {
       // Allow max 1% of coin amount to be transfer fee:
-      $minXFER = max( $minXFER, $this->getSafeTxFee( $exchange, $coin, $averageCoins ) / $safetyFactor );
+      $minXFER = max( $minXFER, $this->getSafeWithdrawFee( $exchange, $coin, $averageCoins ) / $safetyFactor );
 
       $wallets = $exchange->getWallets();
       if ( $wallets[ $coin ] == 0 ) {
@@ -539,7 +531,7 @@ class CoinManager {
                                         Config::DEFAULT_BTC_XFER_SAFETY_FACTOR );
     foreach ( $this->exchanges as $exchange ) {
       // Allow max 1%/safetyFactor of coin amount to be transfer fee:
-      $minXFER = max( $minXFER, $this->getSafeTxFee( $exchange, 'BTC', $averageBTC ) / $safetyFactor );
+      $minXFER = max( $minXFER, $this->getSafeWithdrawFee( $exchange, 'BTC', $averageBTC ) / $safetyFactor );
     }
 
     $remainingProfit = formatBTC( $profit - $restockCash );
@@ -550,10 +542,10 @@ class CoinManager {
 
     logg( "Withdrawing profit: $remainingProfit BTC to $profitAddress", true );
     if ( $highestExchange->withdraw( 'BTC', $remainingProfit, $profitAddress ) ) {
-      $txFee = $this->getSafeTxFee( $highestExchange, 'BTC', $averageBTC );
+      $txFee = $this->getSafeWithdrawFee( $highestExchange, 'BTC', $averageBTC );
       Database::recordProfit( $remainingProfit - $txFee, 'BTC', $profitAddress, time() );
       Database::saveWithdrawal( 'BTC', $remainingProfit, $profitAddress, $highestExchange->getID(), 0,
-                                $highestExchange->getTransferFee( 'BTC', $remainingProfit ) );
+                                $highestExchange->getWithdrawFee( 'BTC', $remainingProfit ) );
 
       // -------------------------------------------------------------------------
       $restockFunds = $this->stats[ self::STAT_AUTOBUY_FUNDS ];
@@ -856,17 +848,17 @@ class CoinManager {
 
   }
 
-  private function doWithdraw( $source, $coin, $amount, $address ) {
+  private function doWithdraw( $source, $coin, $amount, $address, $tag ) {
 
     try {
-      return $source->withdraw( $coin, $amount, $address );
+      return $source->withdraw( $coin, $amount, $address, $tag );
     }
     catch ( Exception $ex ) {
       // Perhaps the withdrawal was unsuccessful because of insufficient balance.
       // This can happen if the account only has $amount balance, in which case
       // we need to subtract the withdrawal fee.
-      $amount -= $source->getTransferFee( $coin, $amount );
-      return $source->withdraw( $coin, $amount, $address );
+      $amount -= $source->getWithdrawFee( $coin, $amount );
+      return $source->withdraw( $coin, $amount, $address, $tag );
     }
 
     return false;
@@ -875,26 +867,68 @@ class CoinManager {
 
   public function withdraw( $source, $target, $coin, $amount ) {
 
+    if ( !Config::isCurrency( $coin ) ) {
+      $limits = $source->getWithdrawLimits( $coin, 'BTC' );
+
+      if ( !is_null( $limits[ 'amount' ][ 'min' ] ) &&
+           floatval( $limits[ 'amount' ][ 'min' ] ) > $amount ) {
+        logg( sprintf( "[%s] Withdrawal amount %s below minimum trade amount %s",
+                       strtoupper( $source->getName() ),
+                       $amount, $limits[ 'amount' ][ 'min' ] ) );
+        return false;
+      }
+
+      if ( !is_null( $limits[ 'amount' ][ 'max' ] ) &&
+           floatval( $limits[ 'amount' ][ 'max' ] ) < $amount ) {
+        logg( sprintf( "[%s] Withdrawal amount %s above maximum trade amount %s",
+                       strtoupper( $source->getName() ),
+                       $amount, $limits[ 'amount' ][ 'max' ] ) );
+        return false;
+      }
+    }
+
+    $amount = formatBTC( $amount );
     logg( "Transfering $amount $coin " . $source->getName() . " => " . $target->getName() );
     $address = $target->getDepositAddress( $coin );
+    $tag = null;
+    if ( is_array( $address ) ) {
+      $tag = $address[ 1 ];
+      $address = $address[ 0 ];
+    }
     if ( is_null( $address ) || strlen( trim( $address ) ) == 0 ) {
       logg( "Invalid deposit address for " . $target->getName() . ", received: ". $address );
 
-      return;
+      return false;
     }
 
 
-    logg( "Deposit address: $address" );
-    if ( $this->doWithdraw( $source, $coin, $amount, trim( $address ) ) ) {
+    logg( "Deposit Address: $address, Memo: " . ( is_null( $tag ) ? "null" : $tag ) );
+    if ( $this->doWithdraw( $source, $coin, $amount, trim( $address ), $tag ) ) {
       Database::saveWithdrawal( $coin, $amount, trim( $address ), $source->getID(), $target->getID(),
-                                $source->getTransferFee( $coin, $amount ) );
+                                $source->getWithdrawFee( $coin, $amount ) +
+                                $target->getDepositFee( $coin, $amount ) );
+
+      return true;
     }
+
+    return false;
 
   }
 
-  public function getSafeTxFee( $exchange, $tradeable, $amount ) {
+  public function getSafeDepositFee( $exchange, $tradeable, $amount ) {
 
-    $fee = $exchange->getTransferFee( $tradeable, $amount );
+    $fee = $exchange->getDepositFee( $tradeable, $amount );
+    if ( is_null( $fee ) ) {
+      $fee = 0;
+    }
+
+    return $fee;
+
+  }
+
+  public function getSafeWithdrawFee( $exchange, $tradeable, $amount ) {
+
+    $fee = $exchange->getWithdrawFee( $tradeable, $amount );
     if ( !is_null( $fee ) ) {
       return $fee;
     }
@@ -908,7 +942,7 @@ class CoinManager {
         continue;
       }
 
-      $txFee = $x->getTransferFee( $tradeable, $amount );
+      $txFee = $x->getWithdrawFee( $tradeable, $amount );
       if ( !is_null( $txFee ) ) {
         $txFees[] = $txFee;
       }
