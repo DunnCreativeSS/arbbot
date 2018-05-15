@@ -28,6 +28,8 @@ abstract class HitBTCLikeExchange extends Exchange {
 
     foreach ( $markets as $market ) {
 
+      $market = json_encode($market, true);
+      $market = json_decode($market, true);
       $name = $this->parseMarketName( $market[ 'symbol' ] );
       if ( $name[ 'currency' ] != $currency ) {
         continue;
@@ -92,6 +94,9 @@ abstract class HitBTCLikeExchange extends Exchange {
   protected function fetchOrderbook( $tradeable, $currency ) {
 
     $orderbook = $this->queryOrderbook( $tradeable, $currency );
+
+      $orderbook = json_encode($orderbook, true);
+      $orderbook = json_decode($orderbook, true);
     if ( count( $orderbook ) == 0 ) {
       return null;
     }
@@ -168,11 +173,10 @@ abstract class HitBTCLikeExchange extends Exchange {
       $data = json_decode($data, true);
       $coin = strtoupper( $data[ 'id' ] );
       $type = strtoupper( $data[ 'crypto' ] );
-
       if ( $coin == 'BTC' ||
            array_search( $coin, $tradeables ) !== false ) {
         $names[ $coin ] = strtoupper( $data[ 'fullName' ] );
-        $txFees[ $coin ] = $data[ 'payoutFee' ] . ($type == 'BITCOIN_PERCENTAGE_FEE' ? '%' : '');
+        $txFees[ $coin ] = (float) $data[ 'payoutFee' ] . ($type == 'BITCOIN_PERCENTAGE_FEE' ? '%' : '');
         //$conf[ $coin ] = $data[ 'MinConfirmation' ];
       }
     }
@@ -294,7 +298,7 @@ abstract class HitBTCLikeExchange extends Exchange {
 
     for ( $i = 0; $i < 100; $i++ ) {
       try {
-        $data = $this->queryAPI( 'account/crypto/address/', ['currency' => $coin ] );
+        $data = $this->queryPostAPI( 'account/crypto/address/'. $coin );
         return isset( $data[ 'address' ] ) ? $data[ 'address' ] : null;
       }
       catch ( Exception $ex ) {
@@ -317,6 +321,7 @@ abstract class HitBTCLikeExchange extends Exchange {
   }
 
   private function queryOrderbook( $tradeable, $currency ) {
+    logg($this->makeMarketName( $currency, $tradeable ));
     return json_decode($this->xtractResponse( $this->queryPublicJSON( $this->getPublicURL() . 'orderbook/' . $this->makeMarketName( $currency, $tradeable ) ) ));
 
   }
@@ -420,6 +425,78 @@ abstract class HitBTCLikeExchange extends Exchange {
     {
         return strtolower(hash_hmac('sha512', $uri . $postData, $this->apiSecret));
     }
+    protected function queryPostAPI( $method, $req = [] ){
+
+    $key = $this->apiKey;
+    $secret = $this->apiSecret;
+    $nonce = $this->nonce();
+
+    $req[ 'apikey' ] = $key;
+    $req[ 'nonce' ] = sprintf( "%ld", $nonce );
+
+    $uri = $this->getPrivateURL() . $method;
+    $sign = hash_hmac( 'sha512', $uri, $secret );
+
+    static $ch = null;
+    if ( is_null( $ch ) ) {
+      $ch = curl_init();
+      curl_setopt( $ch, CURLOPT_RETURNTRANSFER, TRUE );
+      curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, TRUE );
+      curl_setopt( $ch, CURLOPT_USERAGENT, 'Mozilla/4.0 (compatible; Cryptsy API PHP client; ' . php_uname( 's' ) . '; PHP/' . phpversion() . ')' );
+    }
+    curl_setopt( $ch, CURLOPT_URL, $uri );
+    curl_setopt( $ch, CURLOPT_CONNECTTIMEOUT, 10 );
+    curl_setopt( $ch, CURLOPT_TIMEOUT, 180 );
+curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_USERPWD, $key . ":" . $secret);  
+
+
+    $error = null;
+    for ( $i = 0; $i < 5; $i++ ) {
+      try {
+        $data = curl_exec( $ch );
+        $code = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+        if ($code != 200) {
+          if ((json_decode($data, 1))['error']['code'] == 600){
+logg('cannot deposit..');
+return json_encode("{'error':600}");
+}
+          throw new Exception( "HTTP ${code} received from server" );
+        }
+        //
+        if ( $data === false ) {
+          $error = $this->prefix() . "Could not get reply: " . curl_error( $ch );
+          logg( $error );
+          continue;
+        }
+
+        return $this->xtractResponse( $data );
+      }
+      catch ( Exception $ex ) {
+        $error = $ex->getMessage();
+        logg( $this->prefix() . $error );
+
+        if ( strpos( $error, 'ORDER_NOT_OPEN' ) !== false ||
+             strpos( $error, 'MIN_TRADE_REQUIREMENT_NOT_MET' ) !== false ||
+             strpos( $error, 'ADDRESS_GENERATING' ) !== false ||
+             strpos( $error, '_OFFLINE' ) !== false ) {
+          // Real error, don't attempt to retry needlessly.
+          break;
+        }
+
+        // Refresh request parameters
+        $nonce = $this->nonce();
+        $req[ 'nonce' ] = sprintf( "%ld", $nonce );
+        $uri = $this->getPrivateURL() . $method . '?' . http_build_query( $req );
+        $sign = hash_hmac( 'sha512', $uri, $secret );
+        curl_setopt( $ch, CURLOPT_URL, $uri );
+        curl_setopt($ch, CURLOPT_USERPWD, $key . ":" . $secret);  
+        continue;
+      }
+    }
+    throw new Exception( $error );
+
+    } 
   protected function queryAPI( $method, $req = [ ] ) {
 
     $key = $this->apiKey;

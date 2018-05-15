@@ -16,7 +16,9 @@ class HitBTC extends HitBTCLikeExchange {
     parent::__construct( Config::get( "HitBTC.key" ), Config::get( "HitBTC.secret" ),
                          array(
       'separator' => '',
-    ) );
+      'offsetCurrency' => 1,
+      'offsetTradeable' => 0,
+    ));
 
   }
 
