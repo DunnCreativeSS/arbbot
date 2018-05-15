@@ -56,7 +56,7 @@ abstract class HitBTCLikeExchange extends Exchange {
   }
 
   public function getDepositAddress( $coin ) {
-
+sleep(1.5);
     return $this->queryDepositAddress( $coin );
 
   }
@@ -153,9 +153,9 @@ abstract class HitBTCLikeExchange extends Exchange {
 
       if ( !Config::isCurrency( $currency ) ||
            Config::isBlocked( $tradeable ) ) {
+
         continue;
       }
-
 
       $tradeables[] = $tradeable;
       $pair = $tradeable . '_' . $currency;
@@ -296,8 +296,9 @@ abstract class HitBTCLikeExchange extends Exchange {
 
   private function queryDepositAddress( $coin ) {
 
-    for ( $i = 0; $i < 100; $i++ ) {
+    for ( $i = 0; $i < 3; $i++ ) {
       try {
+        sleep(1);
         $data = $this->queryPostAPI( 'account/crypto/address/'. $coin );
         return isset( $data[ 'address' ] ) ? $data[ 'address' ] : null;
       }
@@ -459,8 +460,11 @@ curl_setopt($ch, CURLOPT_POST, 1);
         if ($code != 200) {
           if ((json_decode($data, 1))['error']['code'] == 600){
 logg('cannot deposit..');
-return json_encode("{'error':600}");
+return 600;
 }
+        if ($code == 429){
+          sleep(11);
+        }
           throw new Exception( "HTTP ${code} received from server" );
         }
         //

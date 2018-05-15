@@ -22,7 +22,7 @@ cancel-stray-orders = true
 
 ; Some coins are blocked and aren't traded
 ; because they cannot be automatically withdrawn by the bot.
-blockedCoins = BTS,NXT,XMR,ETH,ETC,BURST,SWIFT,XRP,STEEM,ARDR,SBD,NAUT
+blockedCoins = BTS,BCN,NEO,BURST,SWIFT,STEEM,ARDR,SBD,NAUT
 
 ; Enable the admin UI (enables making modifications to the config of the bot)
 ; NOTE: It is not recommended to enable this unless if the bot's UI is served using
@@ -143,6 +143,34 @@ address =
 
 ; EXCHANGE CONFIGURATION
 ; Configure your exchange settings here
+[bitfinex]
+
+key = 
+
+secret = 
+
+[kraken]
+
+key = 
+
+secret = ; put secret in " " quotes 
+
+[livecoin]
+
+key = 
+
+secret = 
+
+;[HitBTC] disabled by default
+
+;Remember to enable all permissions!
+
+; API key for hitbtc
+;key = 
+
+; API secret for hitbtc
+;secret =
+
 
 [bittrex]
 

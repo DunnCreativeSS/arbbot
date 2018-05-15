@@ -78,6 +78,7 @@ function generateNonce( $id ) {
     $previousNonce[ $id ] = 0;
   }
 
+if ($id == 1 || $id == 13 || $id == 14){
   // Try the current time, if we're getting called too fast, step up one by one.
   $nonce = floor( microtime( true ) * 1000000);
   if ( $nonce <= $previousNonce[ $id ] ) {
@@ -86,6 +87,17 @@ function generateNonce( $id ) {
 
   $previousNonce[ $id ] = $nonce;
   return $nonce;
+}
+else {
+$nonce =  $previousNonce[ $id ] + 1;
+  if ( $nonce <= $previousNonce[ $id ] ) {
+    $nonce = $previousNonce[ $id ] + 1;
+  }
+
+  $previousNonce[ $id ] = $nonce;
+  return $nonce;
+
+}
 }
 
 function installDirectoryDirty() {

@@ -8,6 +8,11 @@ You can see the bot running on a cheap [linode](https://www.linode.com) here.  C
 
 ## Supported Exchanges
 
+  * Bitfinex (all BTC markets) - Jarett Dunn contribution, untested
+  * Livecoin (all BTC markets) - Jarett Dunn contribution, untested
+  * Kraken (all BTC markets) - Jarett Dunn contribution, untested
+  * HitBTC (all BTC markets) - Jarett Dunn contribution, untested - broken
+  * Binance (all BTC markets) - branch of original work
   * Bittrex (all BTC markets)
   * Bleutrade (all BTC markets)
   * Poloniex (all BTC markets)
@@ -181,12 +186,18 @@ will consider buying this coin.
 ## Supporting Future Development
 If you are running this bot and are making profits from it, please consider contributing towards future development of the project, either by contributing code or donating cryptocurrencies.  PR/BTC/ETH contributions are welcome:
 
-* BTC address: `3PUsQxePwa5ck93DaSBy5i9YmGU9kKa9YG`
-* ETH address: `0x2e732524459601546a93ee0307e1533bE69762d9`
+* BTC address (original author): `3PUsQxePwa5ck93DaSBy5i9YmGU9kKa9YG`
+* ETH address (original author): `0x2e732524459601546a93ee0307e1533bE69762d9`
+
+* BTC address (Jarett, v3.0alpha and beyond): `1DcHZUVfmFUXETAsMekCrSdacvKG4f4Wfb`
+* ETH address (Jarett, v3.0alpha and beyond): `0x000a2a2B5D207e044d6b2d6D27EAD6C81A5b0cfD`
 
 Funding this project would allow me to spend time on things like adding support for new exchanges.
 
 ## Release History
+
+* 3.0alpha
+    * Added (untested) support for HitBTC.
 * 2.0
     * Improved the web-based UI, charts, tooltips to help new users, legends
     * Added support for Bleutrade.

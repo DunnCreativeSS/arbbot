@@ -171,7 +171,7 @@ class Arbitrator {
       logg( "Skipping $pair (BLOCKED)" );
       return;
     }
-
+    
     logg( "Checking $pair at " . $x1->getName() . " -> " . $x2->getName() . "..." );
 
     // Measure time for orderbook checks. Sometimes it takes 20+ seconds and could result in a failed trade
