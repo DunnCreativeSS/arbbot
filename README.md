@@ -132,7 +132,7 @@ php main.php
 You should see output like this:
 
 ```
-19:13:34: ARBITRATOR V2.0 launching
+19:13:34: ARBITRATOR V3.0alpha launching
 
 ```
 To actually allow the bot to buy coins automatically, you need to reserve some autobuy funds.  You can do that either by running the following commands against the database manually:
