@@ -198,6 +198,9 @@ Funding this project would allow me to spend time on things like adding support 
 
 * 3.0alpha
     * Added (untested) support for HitBTC.
+    * Added (untested) support for Kraken.
+    * Added (untested) support for Bitfinex.
+    * Added (untested) support for Livecoin.
 * 2.0
     * Improved the web-based UI, charts, tooltips to help new users, legends
     * Added support for Bleutrade.
