@@ -135,7 +135,6 @@ abstract class CCXTAdapter extends Exchange {
       $split = explode( '/', $row[ 'symbol' ] );
 
       // The API doesn't provide the last price, so we just take an average into our spread. :-(
-      logg($row);
       $ticker[ strtoupper( $split[ 0 ] ) ] = formatBTC( ( $row[ 'info' ][ 'bidPrice' ] + $row[ 'info' ][ 'askPrice' ] ) / 2 );
     }
 

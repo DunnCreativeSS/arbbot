@@ -40,7 +40,9 @@ function alert( $type, $message ) {
 }
 
 function logg( $message ) {
-
+  if (is_array($message)){
+    $message = json_encode($message);
+  }
   database::log( $message );
 
   global $gVerbose;

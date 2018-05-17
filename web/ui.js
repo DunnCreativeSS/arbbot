@@ -111,8 +111,14 @@ $(function() {
             return "BLTRD";
         else if (x === "3" || x === 3)
             return "BTTRX";
-        else if (x === "7" || x === 7)
+        else if (x === "15" || x === 15)
+            return "LIVE";
+        else if (x === "14" || x === 14)
+            return "KRKN";
+        else if (x === "10" || x === 10)
             return "HTBTC";
+        else if (x === "13" || x === 13)
+            return "BFINX";
         else
             return "?";
 

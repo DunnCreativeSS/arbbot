@@ -104,11 +104,11 @@ abstract class CCXTAdapterhitbtc extends Exchange {
     }
 
     $tickers = $this->exchange->fetchTickers( $ticker );
-     $lala = str_replace($ticker, "BTC", "");
+     
     $ticker = [ ];
     foreach ( $tickers as $row ) {
       // The API doesn't provide the last price, so we just take an average into our spread. :-(
-      $ticker[ $lala ] = formatBTC( ( $row[ 'bid' ] + $row[ 'ask' ] ) / 2 );
+      $ticker[ $currency ] = formatBTC( ( $row[ 'bid' ] + $row[ 'ask' ] ) / 2 );
     }
 
     return $ticker;

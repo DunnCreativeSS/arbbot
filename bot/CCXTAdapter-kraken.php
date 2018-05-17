@@ -104,11 +104,11 @@ abstract class CCXTAdapterkraken extends Exchange {
     }
 
     $tickers = $this->exchange->fetchTickers( $ticker );
-    $lala = str_replace($ticker, "BTC", "");
     $ticker = [ ];
         foreach ( $tickers as $row ) {
+      $split = explode( '/', $market[ 'symbol' ] );
 
-      $ticker[ $lala ] = formatBTC( ( $row[ $ticker ][ 'b' ][0] + $row[ $ticker ][ 'a' ] [0]) / 2 );
+      $ticker[ $split[0] ] = formatBTC( ( $row[ 'info' ][ 'b' ][0] + $row[ 'info' ][ 'a' ] [0]) / 2 );
     }
 
     return $ticker;

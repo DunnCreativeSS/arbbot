@@ -106,11 +106,9 @@ abstract class CCXTAdapterlivecoin extends Exchange {
     $tickers = $this->exchange->fetchTickers( $ticker );
     $ticker = [ ];
     foreach ( $tickers as $row ) {
-      $split = explode( '/', $row[ 'symbol' ] );
 
       // The API doesn't provide the last price, so we just take an average into our spread. :-(
-      logg($row);
-      $ticker[ strtoupper( $split[ 0 ] ) ] = formatBTC( ( $row[ 'info' ][ 'bidPrice' ] + $row[ 'info' ][ 'askPrice' ] ) / 2 );
+      $ticker[ $currency ] = formatBTC( ( $row[ 'bid' ] + $row[ 'ask' ] ) / 2 );
     }
 
     return $ticker;

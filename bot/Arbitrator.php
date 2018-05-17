@@ -45,7 +45,6 @@ class Arbitrator {
   private function loop() {
 
     Config::refresh();
-
     if ( time() > $this->nextCoinUpdate ) {
       $this->refreshCoinPairs();
       $this->nextCoinUpdate = time() + 3600;

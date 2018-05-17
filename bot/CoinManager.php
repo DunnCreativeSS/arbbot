@@ -42,7 +42,7 @@ class CoinManager {
 
     try {
       //
-      if ( $stats[ self::STAT_NEXT_MANAGEMENT ] <= time() ) {
+      if ( $stats[ self::STAT_NEXT_MANAGEMENT ] >= time() ) {
         //
         self::manageWallets( $arbitrator );
         $stats[ self::STAT_NEXT_MANAGEMENT ] = time() + Config::get( Config::INTERVAL_MANAGEMENT, Config::DEFAULT_INTERVAL_MANAGEMENT ) * 1800;
@@ -164,7 +164,11 @@ class CoinManager {
           Database::saveSnapshot( $coin, $balance, $balance, 0, $exid, $time );
           continue;
         }
-
+        if ($exid == 10 || $exid == 15){
+          logg(json_encode(($ticker)));
+        $rate = formatBTC( $ticker[ 'BTC' ] );
+        
+      }else {
         if ( !key_exists( $coin, $ticker ) ) {
           logg( "$exname | Skipping $coin as it isn't traded against BTC" );
           if ( $value > 0 ) {
@@ -172,8 +176,9 @@ class CoinManager {
           }
           continue;
         }
-
         $rate = formatBTC( $ticker[ $coin ] );
+      }
+
 
         // Calculate desired balance:
         $desiredBalance = 0;
