@@ -211,6 +211,8 @@ class Arbitrator {
                      array_map( 'getCurrency',
                                 $targetOrderbook->getSource()->getTradeables()
                               ) ) ) {
+      logg("Pair not tradeable...");
+   // logg(json_encode($targetOrderbook->getSource()->getTradeables()));
       return false;
     }
 
@@ -220,6 +222,8 @@ class Arbitrator {
       // If our deposit address includes a tag but our source exchange doesn't supports
       // withdrawing with a tag, don't attempt to trade since we won't be able to perform
       // a successful withdrawal.
+            logg("2");
+
       return false;
     }
 
@@ -227,7 +231,9 @@ class Arbitrator {
     $targetBid = $targetOrderbook->getBestBid();
 
     if ( $targetBid->getPrice() <= $sourceAsk->getPrice() ) {
-      return false;
+
+
+    // return false;
     }
 
     /*
@@ -747,8 +753,16 @@ class Arbitrator {
       $this->loop();
     }
     catch ( Exception $ex ) {
+        if ( strpos( $ex->getMessage(), 'Action is not allowed' ) !== false ) {
+          // Wait while the address is being generated.
+          logg('Address generating hitbtc...');
+          sleep( 15 );
+          $this->checkOpportunities();
+        
+  }else{
       logg( "Error during main loop: " . $ex->getMessage() . "\n" . $ex->getTraceAsString() );
     }
+  }
 
   }
 

@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . '/../CCXTAdapter.php';
+require_once __DIR__ . '/../CCXTAdapter-livecoin.php';
 
 define( 'LIVECOIN_ID', 15 );
 
@@ -26,7 +26,7 @@ class LivecoinExchange extends \ccxt\livecoin {
   }
 };
 
-class Livecoin extends CCXTAdapter {
+class Livecoin extends CCXTAdapterlivecoin {
 
   public function __construct() {
     $extraOptions = array(

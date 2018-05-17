@@ -163,11 +163,12 @@ abstract class Exchange {
   }
 
   public function getWithdrawFee( $tradeable, $amount ) {
-
+    if (is_array($this->withdrawFees)){
     if ( !key_exists( $tradeable, $this->withdrawFees ) ) {
       //logg( $this->prefix() . "WARNING: Unknown transfer fee for $tradeable. Calculations may be inaccurate!" );
       return null;
     }
+  }
 
     $fee = $this->withdrawFees[ $tradeable ];
 
@@ -179,11 +180,13 @@ abstract class Exchange {
   }
 
   public function getDepositFee( $tradeable, $amount ) {
+    if (is_array($this->depositFees)){
 
     if ( !key_exists( $tradeable, $this->depositFees ) ) {
       //logg( $this->prefix() . "WARNING: Unknown deposit fee for $tradeable. Calculations may be inaccurate!" );
       return null;
     }
+  }
 
     $fee = $this->depositFees[ $tradeable ];
 

@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . '/../CCXTAdapter.php';
+require_once __DIR__ . '/../CCXTAdapter-bitfinex.php';
 
 define( 'BITFINEX_ID', 13 );
 
@@ -26,7 +26,7 @@ class BitfinexExchange extends \ccxt\bitfinex {
   }
 };
 
-class Bitfinex extends CCXTAdapter {
+class Bitfinex extends CCXTAdapterbitfinex {
 
   public function __construct() {
     $extraOptions = array(

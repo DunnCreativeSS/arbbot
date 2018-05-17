@@ -22,6 +22,8 @@ cancel-stray-orders = true
 
 ; Some coins are blocked and aren't traded
 ; because they cannot be automatically withdrawn by the bot.
+; NOTE That if you use HitBTC and see 'Deposits not allowed on this coin'
+; please add it here, or else it'll trade then not be able to deposit... HitBTC doesn't allow us to grab which aren't depositable until we go to generate a deposit address then it responds with an subpar error
 blockedCoins = BTS,BCN,NEO,BURST,SWIFT,STEEM,ARDR,SBD,NAUT
 
 ; Enable the admin UI (enables making modifications to the config of the bot)
@@ -154,6 +156,8 @@ secret =
 key = 
 
 secret = ; put secret in " " quotes 
+
+; note that livecoin fee discovery == 0 for withdraw and 0 for deposit, the below max. withdrawal fee defaults to allowing all.
 
 [livecoin]
 

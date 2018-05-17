@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . '/../CCXTAdapter.php';
+require_once __DIR__ . '/../CCXTAdapter-kraken.php';
 
 define( 'KRAKEN_ID',14 );
 
@@ -26,7 +26,7 @@ class KrakenExchange extends \ccxt\kraken {
   }
 };
 
-class Kraken extends CCXTAdapter {
+class Kraken extends CCXTAdapterkraken {
 
   public function __construct() {
     $extraOptions = array(
