@@ -1,3 +1,4 @@
+If you found this repo useful, consider clicking the sponsor button near the top :) Sponsoring via GitHub is as little as $1/month and if you do not use banks or credit cards, there are crypto links included :)<br /><br />
 # Arbitrator, A Bitcoin/Altcoin Arbitrage Trading Bot
 The bot checks for altcoins, which are traded on both Poloniex and Bittrex and compares their prices. If the difference is big enough to earn at least some satoshis (after deducting transfer fees), it enters the trade. The bot records its activities and exchange rates in a database and uses this information to reinvest a portion of its profits into the most profitable (in terms of arbitragable) altcoin. Additionally, the amount of held altcoins is calculated based on their exchange rate, transfer fees and times. This allows the bot to profit from hyped (PnD) coins.
 
